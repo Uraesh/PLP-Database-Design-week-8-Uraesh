@@ -6,7 +6,40 @@ require('dotenv').config();
 
 const express = require('express');
 const cors = require('cors');
-const helmet = require('helmet');
+const helmet = require('helmet')// server.js
+const express = require('express');
+
+const json = require('body-parser').json;
+const urlencoded = require('body-parser').urlencoded;
+
+const cors = require('cors');
+const config = require('./src/config/environment');
+
+const app = express();
+
+// Middleware
+app.use(cors());
+app.use(express.json());
+
+// Route de test
+app.get('/', (req, res) => {
+    res.json({ message: 'Clinic Booking API is running!' });
+});
+
+// Route de test pour les patients
+app.get('/api/patients', (req, res) => {
+    res.json({ 
+        message: 'Patients endpoint working',
+        data: []
+    });
+});
+
+// Démarrer le serveur
+const PORT = config.server.port;
+app.listen(PORT, () => {
+    console.log(`🚀 Server running on http://localhost:${PORT}`);
+    console.log(`📡 API endpoints: http://localhost:${PORT}/api`);
+});
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 
@@ -20,8 +53,8 @@ import errorHandler from './src/middleware/errorHandler';
 import logger from './src/middleware/logger';
 
 // Initialisation de l'application Express
-const app = express();
-const PORT = process.env.PORT || 3000;
+// Express app already declared above; no need to redeclare
+// PORT is already declared above; remove this duplicate declaration
 
 // Configuration des middlewares
 app.use(helmet()); // Sécurité
