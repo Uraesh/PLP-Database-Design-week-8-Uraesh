@@ -1,107 +1,96 @@
-// ================================================================
-// server.js - Point d'entrée principal
-// ================================================================
-
-require('dotenv').config();
-
 const express = require('express');
-const cors = require('cors');
-const helmet = require('helmet')// server.js
-const express = require('express');
-
-const json = require('body-parser').json;
-const urlencoded = require('body-parser').urlencoded;
-
 const cors = require('cors');
 const config = require('./src/config/environment');
+const db = require('./src/config/database');
 
 const app = express();
 
 // Middleware
 app.use(cors());
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-// Route de test
-app.get('/', (req, res) => {
-    res.json({ message: 'Clinic Booking API is running!' });
-});
-
-// Route de test pour les patients
-app.get('/api/patients', (req, res) => {
-    res.json({ 
-        message: 'Patients endpoint working',
-        data: []
-    });
-});
-
-// Démarrer le serveur
-const PORT = config.server.port;
-app.listen(PORT, () => {
-    console.log(`🚀 Server running on http://localhost:${PORT}`);
-    console.log(`📡 API endpoints: http://localhost:${PORT}/api`);
-});
-const morgan = require('morgan');
-const rateLimit = require('express-rate-limit');
-
-// Import des routes
-import patientRoutes from './src/routes/patientRoutes';
-import doctorRoutes from './src/routes/doctorRoutes';
-import appointmentRoutes from './src/routes/appointmentRoutes';
-
-// Import des middlewares
-import errorHandler from './src/middleware/errorHandler';
-import logger from './src/middleware/logger';
-
-// Initialisation de l'application Express
-// Express app already declared above; no need to redeclare
-// PORT is already declared above; remove this duplicate declaration
-
-// Configuration des middlewares
-app.use(helmet()); // Sécurité
-app.use(cors()); // CORS
-app.use(json()); // Parsing JSON
-app.use(urlencoded({ extended: true })); // Parsing URL-encoded
-app.use(morgan('dev')); // Logging HTTP
-app.use(logger); // Logging personnalisé
-
-// Limiteur de taux pour prévenir les abus
-const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100, // 100 requêtes par IP
-    message: 'Trop de requêtes, veuillez réessayer plus tard'
-});
-app.use(limiter);
-
-// Routes API
-app.use('/api/patients', patientRoutes);
-app.use('/api/doctors', doctorRoutes);
-app.use('/api/appointments', appointmentRoutes);
+// Test de la base de données au démarrage
+db.testConnection();
 
 // Route de base
 app.get('/', (req, res) => {
     res.json({
-        message: 'Bienvenue sur l\'API de réservation de clinique',
+        message: 'Clinic Booking API is running!',
         version: '1.0.0',
-        endpoints: {
-            patients: '/api/patients',
-            doctors: '/api/doctors',
-            appointments: '/api/appointments'
-        }
+        endpoints: [
+            'GET /api/patients',
+            'POST /api/patients',
+            'GET /api/appointments',
+            'POST /api/appointments'
+        ]
     });
 });
 
-// Middleware de gestion des erreurs
-app.use(errorHandler);
+// Route de test pour les patients
+app.get('/api/patients', async (req, res) => {
+    try {
+        const patients = await db.query('SELECT * FROM patients LIMIT 10');
+        res.json({
+            success: true,
+            data: patients,
+            count: patients.length
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Erreur lors de la récupération des patients',
+            error: error.message
+        });
+    }
+});
+
+// Route de test pour créer un patient
+app.post('/api/patients', async (req, res) => {
+    try {
+        const { first_name, last_name, email, phone, date_of_birth, gender } = req.body;
+        
+        const result = await db.query(
+            'INSERT INTO patients (first_name, last_name, email, phone, date_of_birth, gender) VALUES (?, ?, ?, ?, ?, ?)',
+            [first_name, last_name, email, phone, date_of_birth, gender]
+        );
+        
+        res.status(201).json({
+            success: true,
+            message: 'Patient créé avec succès',
+            data: {
+                id: result.insertId,
+                ...req.body
+            }
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Erreur lors de la création du patient',
+            error: error.message
+        });
+    }
+});
+
+// Middleware de gestion d'erreur
+app.use((err, req, res, next) => {
+    console.error(err.stack);
+    res.status(500).json({
+        success: false,
+        message: 'Erreur interne du serveur'
+    });
+});
 
 // Démarrage du serveur
+const PORT = config.server.port;
 app.listen(PORT, () => {
-    console.log(`Serveur démarré sur le port ${PORT} en mode ${process.env.NODE_ENV}`);
+    console.log('');
+    console.log('🏥 ================================');
+    console.log('   CLINIC BOOKING API STARTED');
+    console.log('🏥 ================================');
+    console.log(`🚀 Server: http://localhost:${PORT}`);
+    console.log(`📡 API: http://localhost:${PORT}/api`);
+    console.log(`📊 Health: http://localhost:${PORT}/`);
+    console.log('================================');
+    console.log('');
 });
-
-// Gestion des erreurs non capturées
-process.on('uncaughtException', (err) => {
-    console.error('Erreur non capturée:', err);
-    process.exit(1);
-});
-
-module.exports = app; // Pour les tests
